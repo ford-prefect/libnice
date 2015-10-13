@@ -127,6 +127,7 @@ enum
   SIGNAL_NEW_SELECTED_PAIR_FULL,
   SIGNAL_NEW_CANDIDATE_FULL,
   SIGNAL_NEW_REMOTE_CANDIDATE_FULL,
+  SIGNAL_SELECT_PORT,
 
   N_SIGNALS,
 };
@@ -997,6 +998,33 @@ nice_agent_class_init (NiceAgentClass *klass)
           G_TYPE_NONE,
           1,
           NICE_TYPE_CANDIDATE,
+          G_TYPE_INVALID);
+
+  /**
+   * NiceAgent::select-port
+   * @agent: The #NiceAgent object
+   * @stream_id: The stream under consideration
+   * @component_id The component under consideration
+   *
+   * Used to select the port to use for the given stream/component pair. Signal
+   * handlers may return 0 to revert to the default (randomly selected port in
+   * specified range).
+   *
+   * Since: XXX
+   */
+  signals[SIGNAL_SELECT_PORT] =
+      g_signal_new (
+          "select-port",
+          G_OBJECT_CLASS_TYPE (klass),
+          G_SIGNAL_RUN_LAST,
+          0,
+          NULL,
+          NULL,
+          NULL,
+          G_TYPE_UINT,
+          2,
+          G_TYPE_UINT,
+          G_TYPE_UINT,
           G_TYPE_INVALID);
 
   /* Init debug options depending on env variables */
@@ -2733,10 +2761,18 @@ nice_agent_gather_candidates (
             break;
         }
 
-        start_port = component->min_port;
-        if(component->min_port != 0) {
-          start_port = nice_rng_generate_int(agent->rng, component->min_port, component->max_port+1);
+        start_port = 0;
+        g_signal_emit (agent, signals[SIGNAL_SELECT_PORT], NULL, stream_id,
+            cid, &start_port);
+        /* XXX: check min/max, do we need to worry about threading? */
+
+        if (!start_port) {
+          start_port = component->min_port;
+          if(component->min_port != 0) {
+            start_port = nice_rng_generate_int(agent->rng, component->min_port, component->max_port+1);
+          }
         }
+
         current_port = start_port;
 
         host_candidate = NULL;
